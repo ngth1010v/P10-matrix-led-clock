@@ -1,4 +1,5 @@
 #include "wifi/WifiController.h"
+#include <esp_wifi.h>
 
 WifiController::~WifiController() {
     if (taskHandle != nullptr) {
@@ -12,10 +13,14 @@ WifiController::~WifiController() {
 void WifiController::init() {
     mutex = xSemaphoreCreateMutex();
     WiFi.mode(WIFI_STA);
+    WiFi.setAutoReconnect(true);
+
+    // Disable Wi-Fi power saving mode to eliminate RF interrupt jitter that impacts display timing
+    esp_wifi_set_ps(WIFI_PS_NONE);
 
     loadFromNVS();
 
-    // Start background monitor task on core 0 (1s check loop)
+    // Start background monitor task on core 1
     xTaskCreatePinnedToCore(
         wifiTask,
         "WifiTask",
@@ -23,7 +28,7 @@ void WifiController::init() {
         this,
         1,
         &taskHandle,
-        0
+        1
     );
 }
 
@@ -48,10 +53,11 @@ void WifiController::addWifi(std::string ssid, std::string password) {
     saveToNVS();
     targetSsid = ssid;
     autoReconnectEnabled = true;
+    currentRetryIdx = 0;
 
     xSemaphoreGive(mutex);
 
-    // Trigger immediate connection attempt
+    // Trigger connection attempt asynchronously
     WiFi.disconnect();
 }
 
@@ -79,6 +85,7 @@ void WifiController::connect(std::string ssid) {
     xSemaphoreTake(mutex, portMAX_DELAY);
     targetSsid = ssid;
     autoReconnectEnabled = true;
+    currentRetryIdx = 0;
     xSemaphoreGive(mutex);
 
     WiFi.disconnect();
@@ -139,12 +146,13 @@ void WifiController::wifiTask(void* pvParameters) {
     WifiController* self = static_cast<WifiController*>(pvParameters);
 
     for (;;) {
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(5000));
 
         xSemaphoreTake(self->mutex, portMAX_DELAY);
         bool shouldReconnect = self->autoReconnectEnabled;
         std::string explicitTarget = self->targetSsid;
         auto wifis = self->savedWifis;
+        size_t retryIdx = self->currentRetryIdx;
         xSemaphoreGive(self->mutex);
 
         if (!shouldReconnect || wifis.empty()) {
@@ -152,38 +160,37 @@ void WifiController::wifiTask(void* pvParameters) {
         }
 
         if (WiFi.status() != WL_CONNECTED) {
-            // Attempt 1: Targeted SSID if set
+            std::string connectSsid = "";
+            std::string connectPass = "";
+
             if (!explicitTarget.empty()) {
                 for (const auto& w : wifis) {
                     if (w.ssid == explicitTarget) {
-                        WiFi.begin(w.ssid.c_str(), w.password.c_str());
-                        
-                        int timeout = 0;
-                        while (WiFi.status() != WL_CONNECTED && timeout < 10) {
-                            vTaskDelay(pdMS_TO_TICKS(500));
-                            timeout++;
-                        }
+                        connectSsid = w.ssid;
+                        connectPass = w.password;
                         break;
                     }
                 }
             }
 
-            // Attempt 2: Sequential failover across saved networks
-            if (WiFi.status() != WL_CONNECTED) {
-                for (const auto& w : wifis) {
-                    WiFi.begin(w.ssid.c_str(), w.password.c_str());
-                    
-                    int timeout = 0;
-                    while (WiFi.status() != WL_CONNECTED && timeout < 10) {
-                        vTaskDelay(pdMS_TO_TICKS(500));
-                        timeout++;
-                    }
-
-                    if (WiFi.status() == WL_CONNECTED) {
-                        break;
-                    }
+            if (connectSsid.empty()) {
+                if (retryIdx >= wifis.size()) {
+                    retryIdx = 0;
                 }
+                connectSsid = wifis[retryIdx].ssid;
+                connectPass = wifis[retryIdx].password;
+
+                xSemaphoreTake(self->mutex, portMAX_DELAY);
+                self->currentRetryIdx = (retryIdx + 1) % wifis.size();
+                xSemaphoreGive(self->mutex);
             }
+
+            if (!connectSsid.empty()) {
+                WiFi.begin(connectSsid.c_str(), connectPass.c_str());
+            }
+        } else {
+            // Re-enforce modem power saving disabled when connected
+            esp_wifi_set_ps(WIFI_PS_NONE);
         }
     }
 }

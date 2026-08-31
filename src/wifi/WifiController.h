@@ -21,6 +21,7 @@ private:
     
     bool autoReconnectEnabled = true;
     std::string targetSsid = ""; // Explicit target requested by connect()
+    size_t currentRetryIdx = 0;
 
     void loadFromNVS();
     void saveToNVS();

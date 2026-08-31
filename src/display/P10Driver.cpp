@@ -76,7 +76,7 @@ void P10Driver::refreshTask(void* pvParameters) {
             );
         }
 
-        // Yield and feed watchdog
+        // Yield execution to allow watchdog feed without letting low priority tasks block execution
         vTaskDelay(1);
     }
 }
@@ -92,13 +92,13 @@ void P10Driver::init() {
     pinMode(PIN_LAT, OUTPUT);
     pinMode(PIN_DR, OUTPUT);
 
-    // Create asynchronous LED refresh task on Core 0
+    // Create high-priority asynchronous LED refresh task pinned to Core 0
     xTaskCreatePinnedToCore(
         refreshTask,
         "P10RefreshTask",
         2048,
         this,
-        1,
+        configMAX_PRIORITIES - 1, // Elevated priority to prevent Wi-Fi ISR preemption flicker
         &refreshTaskHandle,
         0
     );
