@@ -1,82 +1,96 @@
 #include "Storer.h"
 
-Storer::Storer() {}
-
-Storer::~Storer() {
-    prefs.end();
-}
+Storer::Storer() 
+    : timezone(0), timeOffset(0), sleepMode{false, {0, 0, 0}, {0, 0, 0}} {}
 
 void Storer::init() {
-    prefs.begin(NVS_NAMESPACE, false);
+    prefs.begin("stater", false); // Open Preferences namespace "stater" in RW mode
 
-    // Load ConfigWifi
-    configWifi.enable = prefs.getBool("cfg_en", true);
-    configWifi.ssid = prefs.getString("cfg_ssid", "").c_str();
-    configWifi.password = prefs.getString("cfg_pass", "").c_str();
-
-    // Load InternetWifi
-    internetWifi.ssid = prefs.getString("net_ssid", "").c_str();
-    internetWifi.password = prefs.getString("net_pass", "").c_str();
-
-    // Load TimestampData
-    timestampData.timezone = prefs.getChar("ts_tz", 0);
-    timestampData.timestampOffset = prefs.getLong64("ts_offset", 0);
-    timestampData.timestamp = prefs.getULong64("ts_val", 0);
-
-    // Load Schedule Vector
-    size_t schLen = prefs.getBytesLength("sch_vec");
-    if (schLen > 0 && schLen % sizeof(SchedulePeriod) == 0) {
-        size_t count = schLen / sizeof(SchedulePeriod);
-        schedule.resize(count);
-        prefs.getBytes("sch_vec", schedule.data(), schLen);
-    } else {
-        schedule.clear();
-    }
+    // Load persisted values from NVS into RAM
+    configWifi   = loadWifiData("cfg");
+    internetWifi = loadWifiData("net");
+    timezone     = prefs.getChar("tz", 0);
+    timeOffset   = prefs.getLong64("t_off", 0);
+    sleepMode    = loadSleepMode();
 }
 
 void Storer::save() {
-    prefs.begin(NVS_NAMESPACE, false);
+    // Commit all current RAM state to NVS
+    saveWifiData("cfg", configWifi);
+    saveWifiData("net", internetWifi);
+    prefs.putChar("tz", timezone);
+    prefs.putLong64("t_off", timeOffset);
+    saveSleepMode(sleepMode);
+}
 
-    // Save ConfigWifi
-    prefs.putBool("cfg_en", configWifi.enable);
-    prefs.putString("cfg_ssid", configWifi.ssid.c_str());
-    prefs.putString("cfg_pass", configWifi.password.c_str());
+// Helper methods for persistent NVS storage
+void Storer::saveWifiData(const char* prefix, const WifiData& data) {
+    std::string keyName = std::string(prefix) + "_n";
+    std::string keyPass = std::string(prefix) + "_p";
 
-    // Save InternetWifi
-    prefs.putString("net_ssid", internetWifi.ssid.c_str());
-    prefs.putString("net_pass", internetWifi.password.c_str());
+    prefs.putString(keyName.c_str(), data.name.c_str());
+    prefs.putString(keyPass.c_str(), data.password.c_str());
+}
 
-    // Save TimestampData
-    prefs.putChar("ts_tz", timestampData.timezone);
-    prefs.putLong64("ts_offset", timestampData.timestampOffset);
-    prefs.putULong64("ts_val", timestampData.timestamp);
+Storer::WifiData Storer::loadWifiData(const char* prefix) {
+    std::string keyName = std::string(prefix) + "_n";
+    std::string keyPass = std::string(prefix) + "_p";
 
-    // Save Schedule Vector
-    if (!schedule.empty()) {
-        prefs.putBytes("sch_vec", schedule.data(), schedule.size() * sizeof(SchedulePeriod));
-    } else {
-        prefs.remove("sch_vec");
+    WifiData data;
+    data.name     = prefs.getString(keyName.c_str(), "").c_str();
+    data.password = prefs.getString(keyPass.c_str(), "").c_str();
+    return data;
+}
+
+void Storer::saveSleepMode(const SleepMode& mode) {
+    prefs.putBool("sm_en", mode.enable);
+    
+    prefs.putUChar("sm_fh", mode.from.hour);
+    prefs.putUChar("sm_fm", mode.from.minute);
+    prefs.putUChar("sm_fs", mode.from.second);
+
+    prefs.putUChar("sm_th", mode.to.hour);
+    prefs.putUChar("sm_tm", mode.to.minute);
+    prefs.putUChar("sm_ts", mode.to.second);
+}
+
+Storer::SleepMode Storer::loadSleepMode() {
+    SleepMode mode;
+    mode.enable      = prefs.getBool("sm_en", false);
+
+    mode.from.hour   = prefs.getUChar("sm_fh", 0);
+    mode.from.minute = prefs.getUChar("sm_fm", 0);
+    mode.from.second = prefs.getUChar("sm_fs", 0);
+
+    mode.to.hour     = prefs.getUChar("sm_th", 0);
+    mode.to.minute   = prefs.getUChar("sm_tm", 0);
+    mode.to.second   = prefs.getUChar("sm_ts", 0);
+
+    return mode;
+}
+
+// Config WiFi
+void Storer::setConfigWifi(WifiData _configWifi) {
+    if (configWifi.name != _configWifi.name || configWifi.password != _configWifi.password) {
+        configWifi = _configWifi;
+        if (configWifiCb) configWifiCb();
     }
 }
 
-// ConfigWifi
-void Storer::setConfigWifi(const ConfigWifiData& _configWifi) {
-    configWifi = _configWifi;
-    if (configWifiCB) configWifiCB();
-}
-
-Storer::ConfigWifiData Storer::getConfigWifi() const {
+Storer::WifiData Storer::getConfigWifi() const {
     return configWifi;
 }
 
 void Storer::onConfigWifiChange(Callback callback) {
-    configWifiCB = callback;
+    configWifiCb = callback;
 }
 
-// InternetWifi
-void Storer::setInternetWifi(const WifiData& _internetWifi) {
-    internetWifi = _internetWifi;
-    if (internetWifiCB) internetWifiCB();
+// Internet WiFi
+void Storer::setInternetWifi(WifiData _internetWifi) {
+    if (internetWifi.name != _internetWifi.name || internetWifi.password != _internetWifi.password) {
+        internetWifi = _internetWifi;
+        if (internetWifiCb) internetWifiCb();
+    }
 }
 
 Storer::WifiData Storer::getInternetWifi() const {
@@ -84,33 +98,51 @@ Storer::WifiData Storer::getInternetWifi() const {
 }
 
 void Storer::onInternetWifiChange(Callback callback) {
-    internetWifiCB = callback;
+    internetWifiCb = callback;
 }
 
-// TimestampData
-void Storer::setTimestampData(const TimestampData& _timestampData) {
-    timestampData = _timestampData;
-    if (timestampDataCB) timestampDataCB();
+// Timezone
+void Storer::setTimezone(int8_t _timezone) {
+    if (timezone != _timezone) {
+        timezone = _timezone;
+        if (timezoneCb) timezoneCb();
+    }
 }
 
-Storer::TimestampData Storer::getTimestampData() const {
-    return timestampData;
+int8_t Storer::getTimezone() const {
+    return timezone;
 }
 
-void Storer::onTimestampDataChange(Callback callback) {
-    timestampDataCB = callback;
+void Storer::onTimezoneChange(Callback callback) {
+    timezoneCb = callback;
 }
 
-// Schedule
-void Storer::setSchedule(const std::vector<SchedulePeriod>& _schedule) {
-    schedule = _schedule;
-    if (scheduleCB) scheduleCB();
+// Time Offset
+void Storer::setTimeOffset(int64_t _timeOffset) {
+    if (timeOffset != _timeOffset) {
+        timeOffset = _timeOffset;
+        if (timeOffsetCb) timeOffsetCb();
+    }
 }
 
-std::vector<Storer::SchedulePeriod> Storer::getSchedule() const {
-    return schedule;
+int64_t Storer::getTimeOffset() const {
+    return timeOffset;
 }
 
-void Storer::onScheduleChange(Callback callback) {
-    scheduleCB = callback;
+void Storer::onTimeOffsetChange(Callback callback) {
+    timeOffsetCb = callback;
+}
+
+// Sleep Mode
+void Storer::setSleepMode(SleepMode _sleepMode) {
+    sleepMode = _sleepMode;
+    if (sleepModeCb) sleepModeCb();
+}
+
+Storer::SleepMode Storer::getSleepMode() const {
+    return sleepMode;
+}
+
+void Storer::onSleepModeChange(Callback callback) {
+    sleepModeCb = callback;
 }

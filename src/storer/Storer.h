@@ -1,94 +1,81 @@
-#pragma once
+#pragma one
 
-#include <Arduino.h>
-#include <Preferences.h>
 #include <string>
-#include <vector>
+#include <cstdint>
 #include <functional>
+#include <Preferences.h>
 
 class Storer {
 public:
-    struct ConfigWifiData {
-        bool enable = true;
-        std::string ssid;
-        std::string password;
+    struct WifiData { 
+        std::string name; 
+        std::string password; 
     };
 
-    struct WifiData {
-        std::string ssid;
-        std::string password;
+    struct TimeData {  
+        uint8_t hour;
+        uint8_t minute;
+        uint8_t second;
     };
 
-    struct TimestampData {
-        int8_t timezone;
-        int64_t timestampOffset; // in seconds
-        uint64_t timestamp;       // in seconds
-    };
-
-    struct SchedulePeriod {
-        enum class ClockMode : uint8_t {
-            NORMAL = 0,
-            MINI   = 1,
-        };
-        enum class RepeatState : uint8_t {
-            MINUTE = 0,
-            HOUR   = 1,
-            DAY    = 2,
-            WEEK   = 3,
-        };
-        struct SoundState {
-            uint8_t volumn; // 0-100
-            uint8_t repeat;
-            uint8_t soundId;
-        };
-
-        RepeatState repeat;
-        SoundState startSound;
-        uint8_t startClockFlash;
-        ClockMode clockMode;
+    struct SleepMode {
+        bool     enable;
+        TimeData from;
+        TimeData to;            
     };
 
     using Callback = std::function<void()>;
 
-private:
-    Preferences prefs;
-    const char* NVS_NAMESPACE = "esp_stater";
+private: 
+    WifiData  internetWifi;
+    WifiData  configWifi;
+    int8_t    timezone;
+    int64_t   timeOffset;
+    SleepMode sleepMode;
 
-    ConfigWifiData configWifi;
-    WifiData internetWifi;
-    TimestampData timestampData;
-    std::vector<SchedulePeriod> schedule;
+    Preferences prefs;
 
     // Callbacks
-    Callback configWifiCB;
-    Callback internetWifiCB;
-    Callback timestampDataCB;
-    Callback scheduleCB;
+    Callback configWifiCb;
+    Callback internetWifiCb;
+    Callback timezoneCb;
+    Callback timeOffsetCb;
+    Callback sleepModeCb;
+
+    // Helper functions for reading/writing NVS
+    void saveWifiData(const char* prefix, const WifiData& data);
+    WifiData loadWifiData(const char* prefix);
+    void saveSleepMode(const SleepMode& mode);
+    SleepMode loadSleepMode();
 
 public:
     Storer();
-    ~Storer();
 
     void init();
-    void save(); // Commits all current in-memory state to NVS
+    void save(); // Persists all current RAM state to NVS
 
-    // ConfigWifi
-    void setConfigWifi(const ConfigWifiData& _configWifi);
-    ConfigWifiData getConfigWifi() const;
+    // Config WiFi
+    void setConfigWifi(WifiData _configWifi);
+    WifiData getConfigWifi() const;
     void onConfigWifiChange(Callback callback);
 
-    // InternetWifi
-    void setInternetWifi(const WifiData& _internetWifi);
+    // Internet WiFi
+    void setInternetWifi(WifiData _internetWifi);
     WifiData getInternetWifi() const;
     void onInternetWifiChange(Callback callback);
 
-    // TimestampData
-    void setTimestampData(const TimestampData& _timestampData);
-    TimestampData getTimestampData() const;
-    void onTimestampDataChange(Callback callback);
+    // Timezone
+    void setTimezone(int8_t _timezone);
+    int8_t getTimezone() const;
+    void onTimezoneChange(Callback callback);
 
-    // Schedule
-    void setSchedule(const std::vector<SchedulePeriod>& _schedule);
-    std::vector<SchedulePeriod> getSchedule() const;
-    void onScheduleChange(Callback callback);
+    // Time Offset
+    void setTimeOffset(int64_t _timeOffset);
+    int64_t getTimeOffset() const;
+    void onTimeOffsetChange(Callback callback);
+
+    // Sleep Mode
+    void setSleepMode(SleepMode _sleepMode);
+    SleepMode getSleepMode() const;
+    void onSleepModeChange(Callback callback);
 };
