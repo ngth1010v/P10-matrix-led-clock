@@ -1,4 +1,4 @@
-#pragma one
+#pragma once
 
 #include <string>
 #include <cstdint>
@@ -32,6 +32,7 @@ private:
     int8_t    timezone;
     int64_t   timeOffset;
     SleepMode sleepMode;
+    bool      openConfig;
 
     Preferences prefs;
 
@@ -41,6 +42,7 @@ private:
     Callback timezoneCb;
     Callback timeOffsetCb;
     Callback sleepModeCb;
+    Callback openConfigCb;
 
     // Helper functions for reading/writing NVS
     void saveWifiData(const char* prefix, const WifiData& data);
@@ -78,4 +80,9 @@ public:
     void setSleepMode(SleepMode _sleepMode);
     SleepMode getSleepMode() const;
     void onSleepModeChange(Callback callback);
+
+    // Open Config
+    void setOpenConfig(bool _openConfig);
+    bool getOpenConfig() const;
+    void onOpenConfigChange(Callback callback);
 };

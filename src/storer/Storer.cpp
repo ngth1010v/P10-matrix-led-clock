@@ -1,7 +1,7 @@
 #include "Storer.h"
 
 Storer::Storer() 
-    : timezone(0), timeOffset(0), sleepMode{false, {0, 0, 0}, {0, 0, 0}} {}
+    : timezone(0), timeOffset(0), sleepMode{false, {0, 0, 0}, {0, 0, 0}}, openConfig(false) {}
 
 void Storer::init() {
     prefs.begin("stater", false); // Open Preferences namespace "stater" in RW mode
@@ -12,6 +12,7 @@ void Storer::init() {
     timezone     = prefs.getChar("tz", 0);
     timeOffset   = prefs.getLong64("t_off", 0);
     sleepMode    = loadSleepMode();
+    openConfig   = prefs.getBool("op_cfg", false);
 }
 
 void Storer::save() {
@@ -21,6 +22,7 @@ void Storer::save() {
     prefs.putChar("tz", timezone);
     prefs.putLong64("t_off", timeOffset);
     saveSleepMode(sleepMode);
+    prefs.putBool("op_cfg", openConfig);
 }
 
 // Helper methods for persistent NVS storage
@@ -145,4 +147,20 @@ Storer::SleepMode Storer::getSleepMode() const {
 
 void Storer::onSleepModeChange(Callback callback) {
     sleepModeCb = callback;
+}
+
+// Open Config
+void Storer::setOpenConfig(bool _openConfig) {
+    if (openConfig != _openConfig) {
+        openConfig = _openConfig;
+        if (openConfigCb) openConfigCb();
+    }
+}
+
+bool Storer::getOpenConfig() const {
+    return openConfig;
+}
+
+void Storer::onOpenConfigChange(Callback callback) {
+    openConfigCb = callback;
 }
