@@ -35,6 +35,7 @@ private:
     bool      openConfig;
 
     Preferences prefs;
+    bool initialized;
 
     // Callbacks
     Callback configWifiCb;
