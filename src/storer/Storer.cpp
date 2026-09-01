@@ -1,4 +1,3 @@
-
 #include "Storer.h"
 
 Storer::Storer()
@@ -20,6 +19,10 @@ void Storer::init() {
     openConfig   = prefs.getBool("op_cfg", true);
 
     initialized = true;
+}
+
+bool Storer::isInit() const {
+    return initialized;
 }
 
 void Storer::save() {
@@ -82,128 +85,54 @@ Storer::SleepMode Storer::loadSleepMode() {
 
 // Config WiFi
 void Storer::setConfigWifi(WifiData _configWifi) {
-    if (configWifi.name != _configWifi.name ||
-        configWifi.password != _configWifi.password) {
-
-        configWifi = _configWifi;
-
-        if (configWifiCb)
-            configWifiCb();
-    }
+    configWifi = _configWifi;
 }
 
 Storer::WifiData Storer::getConfigWifi() const {
     return configWifi;
 }
 
-void Storer::onConfigWifiChange(Callback callback) {
-    configWifiCb = callback;
-
-    if (initialized && configWifiCb)
-        configWifiCb();
-}
-
 // Internet WiFi
 void Storer::setInternetWifi(WifiData _internetWifi) {
-    if (internetWifi.name != _internetWifi.name ||
-        internetWifi.password != _internetWifi.password) {
-
-        internetWifi = _internetWifi;
-
-        if (internetWifiCb)
-            internetWifiCb();
-    }
+    internetWifi = _internetWifi;
 }
 
 Storer::WifiData Storer::getInternetWifi() const {
     return internetWifi;
 }
 
-void Storer::onInternetWifiChange(Callback callback) {
-    internetWifiCb = callback;
-
-    if (initialized && internetWifiCb)
-        internetWifiCb();
-}
-
 // Timezone
 void Storer::setTimezone(int8_t _timezone) {
-    if (timezone != _timezone) {
-        timezone = _timezone;
-
-        if (timezoneCb)
-            timezoneCb();
-    }
+    timezone = _timezone;
 }
 
 int8_t Storer::getTimezone() const {
     return timezone;
 }
 
-void Storer::onTimezoneChange(Callback callback) {
-    timezoneCb = callback;
-
-    if (initialized && timezoneCb)
-        timezoneCb();
-}
-
 // Time Offset
 void Storer::setTimeOffset(int64_t _timeOffset) {
-    if (timeOffset != _timeOffset) {
-        timeOffset = _timeOffset;
-
-        if (timeOffsetCb)
-            timeOffsetCb();
-    }
+    timeOffset = _timeOffset;
 }
 
 int64_t Storer::getTimeOffset() const {
     return timeOffset;
 }
 
-void Storer::onTimeOffsetChange(Callback callback) {
-    timeOffsetCb = callback;
-
-    if (initialized && timeOffsetCb)
-        timeOffsetCb();
-}
-
 // Sleep Mode
 void Storer::setSleepMode(SleepMode _sleepMode) {
     sleepMode = _sleepMode;
-
-    if (sleepModeCb)
-        sleepModeCb();
 }
 
 Storer::SleepMode Storer::getSleepMode() const {
     return sleepMode;
 }
 
-void Storer::onSleepModeChange(Callback callback) {
-    sleepModeCb = callback;
-
-    if (initialized && sleepModeCb)
-        sleepModeCb();
-}
-
 // Open Config
 void Storer::setOpenConfig(bool _openConfig) {
-    if (openConfig != _openConfig) {
-        openConfig = _openConfig;
-
-        if (openConfigCb)
-            openConfigCb();
-    }
+    openConfig = _openConfig;
 }
 
 bool Storer::getOpenConfig() const {
     return openConfig;
-}
-
-void Storer::onOpenConfigChange(Callback callback) {
-    openConfigCb = callback;
-
-    if (initialized && openConfigCb)
-        openConfigCb();
 }
