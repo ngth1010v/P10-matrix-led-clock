@@ -1,38 +1,63 @@
-// ================================
+
+// ========================================
 // DOM elements
-// ================================
+// ========================================
 
-const internetWifiName = document.getElementById("internetWifiName");
-const internetWifiPassword = document.getElementById("internetWifiPassword");
+// Internet WiFi
+const internetWifiName =
+  document.getElementById("internetWifiName");
 
-const configWifiName = document.getElementById("configWifiName");
-const configWifiPassword = document.getElementById("configWifiPassword");
+const internetWifiPassword =
+  document.getElementById("internetWifiPassword");
 
-const timezone = document.getElementById("timezone");
-const timeOffset = document.getElementById("timeOffset");
 
-const sleepModeEnable = document.getElementById("sleepModeEnable");
+// Config WiFi
+const configWifiName =
+  document.getElementById("configWifiName");
+
+const configWifiPassword =
+  document.getElementById("configWifiPassword");
+
+
+// Time
+const timezone =
+  document.getElementById("timezone");
+
+const timeOffset =
+  document.getElementById("timeOffset");
+
+
+// Sleep mode
+const sleepModeEnable =
+  document.getElementById("sleepModeEnable");
 
 const sleepModeFromHour =
   document.getElementById("sleepModeFromHour");
+
 const sleepModeFromMinute =
   document.getElementById("sleepModeFromMinute");
+
 const sleepModeFromSecond =
   document.getElementById("sleepModeFromSecond");
 
 const sleepModeToHour =
   document.getElementById("sleepModeToHour");
+
 const sleepModeToMinute =
   document.getElementById("sleepModeToMinute");
+
 const sleepModeToSecond =
   document.getElementById("sleepModeToSecond");
 
-const saveButton = document.querySelector(".save-button");
+
+// Save button
+const saveButton =
+  document.querySelector(".save-button");
 
 
-// ================================
-// Load config from ESP32
-// ================================
+// ========================================
+// Load configuration from ESP32
+// ========================================
 
 async function loadConfig() {
   try {
@@ -44,23 +69,33 @@ async function loadConfig() {
 
     const config = await response.json();
 
+
+    // ------------------------------------
     // Internet WiFi
+    // ------------------------------------
+
     internetWifiName.value =
-      config.internetWifiName ?? "";
+      config.internetWifi?.name ?? "";
 
     internetWifiPassword.value =
-      config.internetWifiPassword ?? "";
+      config.internetWifi?.password ?? "";
 
 
+    // ------------------------------------
     // Config WiFi
+    // ------------------------------------
+
     configWifiName.value =
-      config.configWifiName ?? "";
+      config.configWifi?.name ?? "";
 
     configWifiPassword.value =
-      config.configWifiPassword ?? "";
+      config.configWifi?.password ?? "";
 
 
+    // ------------------------------------
     // Time
+    // ------------------------------------
+
     timezone.value =
       config.timezone ?? 0;
 
@@ -68,81 +103,62 @@ async function loadConfig() {
       config.timeOffset ?? 0;
 
 
+    // ------------------------------------
     // Sleep mode
+    // ------------------------------------
+
+    const sleepMode =
+      config.sleepMode ?? {};
+
+
     sleepModeEnable.value =
-      String(config.sleepModeEnable ?? false);
+      String(sleepMode.enable ?? false);
 
 
-    // Sleep mode - From
-    if (config.sleepModeFrom) {
-      sleepModeFromHour.value =
-        config.sleepModeFrom.hour ?? 0;
+    // From
+    sleepModeFromHour.value =
+      sleepMode.from?.hour ?? 0;
 
-      sleepModeFromMinute.value =
-        config.sleepModeFrom.minute ?? 0;
+    sleepModeFromMinute.value =
+      sleepMode.from?.minute ?? 0;
 
-      sleepModeFromSecond.value =
-        config.sleepModeFrom.second ?? 0;
-    }
+    sleepModeFromSecond.value =
+      sleepMode.from?.second ?? 0;
 
 
-    // Sleep mode - To
-    if (config.sleepModeTo) {
-      sleepModeToHour.value =
-        config.sleepModeTo.hour ?? 0;
+    // To
+    sleepModeToHour.value =
+      sleepMode.to?.hour ?? 0;
 
-      sleepModeToMinute.value =
-        config.sleepModeTo.minute ?? 0;
+    sleepModeToMinute.value =
+      sleepMode.to?.minute ?? 0;
 
-      sleepModeToSecond.value =
-        config.sleepModeTo.second ?? 0;
-    }
+    sleepModeToSecond.value =
+      sleepMode.to?.second ?? 0;
+
 
   } catch (error) {
-    console.error("Failed to load config:", error);
+
+    console.error(
+      "Failed to load configuration:",
+      error
+    );
 
     alert("Failed to load configuration.");
   }
 }
 
 
-// ================================
-// Build config from HTML
-// ================================
+// ========================================
+// Get SleepMode from form
+// ========================================
 
-function getConfigFromForm() {
+function getSleepModeFromForm() {
   return {
-    // Internet WiFi
-    internetWifiName:
-      internetWifiName.value,
-
-    internetWifiPassword:
-      internetWifiPassword.value,
-
-
-    // Config WiFi
-    configWifiName:
-      configWifiName.value,
-
-    configWifiPassword:
-      configWifiPassword.value,
-
-
-    // Time
-    timezone:
-      Number(timezone.value),
-
-    timeOffset:
-      Number(timeOffset.value),
-
-
-    // Sleep mode
-    sleepModeEnable:
+    enable:
       sleepModeEnable.value === "true",
 
-
-    // Sleep mode - From
-    sleepModeFrom: {
+    from: {
       hour:
         Number(sleepModeFromHour.value),
 
@@ -153,9 +169,7 @@ function getConfigFromForm() {
         Number(sleepModeFromSecond.value)
     },
 
-
-    // Sleep mode - To
-    sleepModeTo: {
+    to: {
       hour:
         Number(sleepModeToHour.value),
 
@@ -169,55 +183,124 @@ function getConfigFromForm() {
 }
 
 
-// ================================
-// Save config to ESP32
-// ================================
+// ========================================
+// Get complete configuration from form
+// ========================================
+
+function getConfigFromForm() {
+  return {
+
+    internetWifi: {
+      name:
+        internetWifiName.value,
+
+      password:
+        internetWifiPassword.value
+    },
+
+
+    configWifi: {
+      name:
+        configWifiName.value,
+
+      password:
+        configWifiPassword.value
+    },
+
+
+    timezone:
+      Number(timezone.value),
+
+    timeOffset:
+      Number(timeOffset.value),
+
+
+    sleepMode:
+      getSleepModeFromForm()
+  };
+}
+
+
+// ========================================
+// Save configuration to ESP32
+// ========================================
 
 async function saveConfig() {
   try {
-    const config = getConfigFromForm();
 
-    console.log("Saving config:", config);
+    const config =
+      getConfigFromForm();
 
-    const response = await fetch("/api/config", {
-      method: "POST",
 
-      headers: {
-        "Content-Type": "application/json"
-      },
+    console.log(
+      "Saving configuration:",
+      config
+    );
 
-      body: JSON.stringify(config)
-    });
+
+    const response = await fetch(
+      "/api/config",
+      {
+        method: "POST",
+
+        headers: {
+          "Content-Type":
+            "application/json"
+        },
+
+        body:
+          JSON.stringify(config)
+      }
+    );
 
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+      throw new Error(
+        `HTTP ${response.status}`
+      );
     }
 
-    const result = await response.json();
 
-    console.log("Save result:", result);
+    const result =
+      await response.json();
+
+
+    console.log(
+      "Save result:",
+      result
+    );
+
 
     alert("Configuration saved.");
 
-  } catch (error) {
-    console.error("Failed to save config:", error);
 
-    alert("Failed to save configuration.");
+  } catch (error) {
+
+    console.error(
+      "Failed to save configuration:",
+      error
+    );
+
+    alert(
+      "Failed to save configuration."
+    );
   }
 }
 
 
-// ================================
-// Event listeners
-// ================================
+// ========================================
+// Events
+// ========================================
 
-saveButton.addEventListener("click", saveConfig);
+saveButton.addEventListener(
+  "click",
+  saveConfig
+);
 
 
-// ================================
+// ========================================
 // Initial load
-// ================================
+// ========================================
 
 loadConfig();
 
