@@ -26,6 +26,8 @@ public:
         std::string toText;
         bool mini{false};
         uint delay{0}; // Delay before starting this specific item's sliding within the batch (ms)
+        bool alignTop{true};
+        bool alignLeft{true};
     };
 
     struct AnimationBatch {
@@ -60,7 +62,7 @@ public:
     void init(P10Driver* p10Driver, FontRenderer* fontRenderer);
 
     // Adds animation task to current building batch
-    void animate(uint x, uint y, std::string fromText, std::string toText, bool mini, uint delay);
+    void animate(uint x, uint y, std::string fromText, std::string toText, bool mini, uint delay, bool alignTop = true, bool alignLeft = true);
 
     // Seals current batch and pushes to worker queue
     void startAnimate();

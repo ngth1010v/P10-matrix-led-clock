@@ -35,7 +35,7 @@ void Animator::init(P10Driver* p10Driver, FontRenderer* pFontRenderer) {
     }
 }
 
-void Animator::animate(uint x, uint y, std::string fromText, std::string toText, bool mini, uint delay) {
+void Animator::animate(uint x, uint y, std::string fromText, std::string toText, bool mini, uint delay, bool alignTop, bool alignLeft) {
     AnimationTask task;
     task.x = x;
     task.y = y;
@@ -43,6 +43,8 @@ void Animator::animate(uint x, uint y, std::string fromText, std::string toText,
     task.toText = toText;
     task.mini = mini;
     task.delay = delay;
+    task.alignTop = alignTop;
+    task.alignLeft = alignLeft;
 
     currentBuildingBatch.push_back(task);
 }
@@ -125,6 +127,10 @@ void Animator::processBatch(const AnimationBatch& batch) {
         FontRenderer::Bitmap toBmp;
         uint maxW;
         uint maxH;
+        uint fromXOffset;
+        uint toXOffset;
+        uint fromYOffset;
+        uint toYOffset;
     };
 
     std::vector<PreparedTask> prepared;
@@ -142,6 +148,14 @@ void Animator::processBatch(const AnimationBatch& batch) {
 
         pt.maxW = std::max(pt.fromBmp.w, pt.toBmp.w);
         pt.maxH = std::max(pt.fromBmp.h, pt.toBmp.h);
+
+        // Horizontal alignment offsets within maxW bounding box
+        pt.fromXOffset = task.alignLeft ? 0 : (pt.maxW - pt.fromBmp.w);
+        pt.toXOffset   = task.alignLeft ? 0 : (pt.maxW - pt.toBmp.w);
+
+        // Vertical alignment offsets within maxH bounding box
+        pt.fromYOffset = task.alignTop ? 0 : (pt.maxH - pt.fromBmp.h);
+        pt.toYOffset   = task.alignTop ? 0 : (pt.maxH - pt.toBmp.h);
 
         uint32_t taskTime = task.delay + ANIMATE_DURATION;
         if (taskTime > maxTotalTaskTime) {
@@ -179,16 +193,21 @@ void Animator::processBatch(const AnimationBatch& batch) {
                     bool pixelOn = false;
 
                     // Exiting bitmap (fromText) sliding down out of crop box
-                    int fromSourceY = (int)localY - shiftY;
-                    if (fromSourceY >= 0 && fromSourceY < (int)pt.fromBmp.h && localX < pt.fromBmp.w) {
-                        pixelOn = pt.fromBmp.pixels[localX][fromSourceY];
+                    int fromSourceX = (int)localX - (int)pt.fromXOffset;
+                    int fromSourceY = (int)localY - (int)pt.fromYOffset - shiftY;
+
+                    if (fromSourceX >= 0 && fromSourceX < (int)pt.fromBmp.w &&
+                        fromSourceY >= 0 && fromSourceY < (int)pt.fromBmp.h) {
+                        pixelOn = pt.fromBmp.pixels[fromSourceX][fromSourceY];
                     }
 
                     // Entering bitmap (toText) sliding down into crop box from top
-                    // Offset includes the 1px gap between fromText and toText
-                    int toSourceY = (int)localY - shiftY + totalDistance;
-                    if (toSourceY >= 0 && toSourceY < (int)pt.toBmp.h && localX < pt.toBmp.w) {
-                        pixelOn = pixelOn || pt.toBmp.pixels[localX][toSourceY];
+                    int toSourceX = (int)localX - (int)pt.toXOffset;
+                    int toSourceY = (int)localY - (int)pt.toYOffset - shiftY + totalDistance;
+
+                    if (toSourceX >= 0 && toSourceX < (int)pt.toBmp.w &&
+                        toSourceY >= 0 && toSourceY < (int)pt.toBmp.h) {
+                        pixelOn = pixelOn || pt.toBmp.pixels[toSourceX][toSourceY];
                     }
 
                     driver->set(pt.x + localX, pt.y + localY, pixelOn);
@@ -205,9 +224,15 @@ void Animator::processBatch(const AnimationBatch& batch) {
         for (uint localX = 0; localX < pt.maxW; ++localX) {
             for (uint localY = 0; localY < pt.maxH; ++localY) {
                 bool pixelOn = false;
-                if (localX < pt.toBmp.w && localY < pt.toBmp.h) {
-                    pixelOn = pt.toBmp.pixels[localX][localY];
+
+                int toSourceX = (int)localX - (int)pt.toXOffset;
+                int toSourceY = (int)localY - (int)pt.toYOffset;
+
+                if (toSourceX >= 0 && toSourceX < (int)pt.toBmp.w &&
+                    toSourceY >= 0 && toSourceY < (int)pt.toBmp.h) {
+                    pixelOn = pt.toBmp.pixels[toSourceX][toSourceY];
                 }
+
                 driver->set(pt.x + localX, pt.y + localY, pixelOn);
             }
         }
