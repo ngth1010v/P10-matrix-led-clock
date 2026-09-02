@@ -1,4 +1,5 @@
 #include "display/P10Driver.h"
+#include "esp_task_wdt.h"
 
 void P10Driver::selectRow(uint8_t row) {
     digitalWrite(PIN_A, (row & 0x01) ? HIGH : LOW);
@@ -6,9 +7,7 @@ void P10Driver::selectRow(uint8_t row) {
 }
 
 void P10Driver::writeLed(bool on) {
-    // P10 Active LOW:
-    // true  -> LOW  -> LED ON
-    // false -> HIGH -> LED OFF
+    // P10 Active LOW: true -> LOW, false -> HIGH
     digitalWrite(PIN_DR, on ? LOW : HIGH);
 
     digitalWrite(PIN_CLK, HIGH);
@@ -16,36 +15,25 @@ void P10Driver::writeLed(bool on) {
 }
 
 void P10Driver::writeRow(uint8_t row, const uint8_t* data) {
-    // Disable output while shifting data
-    digitalWrite(PIN_OE, HIGH);
-
-    // 256 bits total per row = 32 bytes (MSB first)
+    // Shift dữ liệu
     for (uint16_t byteIdx = 0; byteIdx < 32; byteIdx++) {
         uint8_t b = data[byteIdx];
         for (int8_t bitIdx = 7; bitIdx >= 0; bitIdx--) {
-            bool bitVal = (b >> bitIdx) & 0x01;
-            writeLed(bitVal);
+            digitalWrite(PIN_DR, ((b >> bitIdx) & 0x01) ? LOW : HIGH);
+            digitalWrite(PIN_CLK, HIGH);
+            digitalWrite(PIN_CLK, LOW);
         }
     }
 
-    // Latch shifted data
+    // Chốt dữ liệu
     digitalWrite(PIN_LAT, HIGH);
     digitalWrite(PIN_LAT, LOW);
 
-    // Select scan row
+    // Chọn hàng mới
     selectRow(row);
 
-    // Dead time
-    delayMicroseconds(5);
-
-    // Enable output
-    digitalWrite(PIN_OE, LOW);
-
-    // Display time
-    delayMicroseconds(brightness);
-
-    // Disable output before next row
-    digitalWrite(PIN_OE, HIGH);
+    // Dead-time ngắn để MOSFET giải phóng hết điện áp tích tụ
+    // delayMicroseconds(5);
 }
 
 P10Driver::MatrixPosition P10Driver::BufferPosToDisplayPos(uint x, uint y) {
@@ -64,22 +52,32 @@ P10Driver::MatrixPosition P10Driver::BufferPosToDisplayPos(uint x, uint y) {
 void P10Driver::refreshTask(void* pvParameters) {
     P10Driver* instance = static_cast<P10Driver*>(pvParameters);
 
+    digitalWrite(PIN_OE, HIGH);
+
     while (true) {
-        // Read current active buffer index atomically
         uint8_t readIdx = instance->activeBufferIdx.load(std::memory_order_relaxed);
 
-        // Refresh all 4 scan rows
         for (uint8_t i = 0; i < 4; i++) {
+            digitalWrite(PIN_OE, HIGH);
+
             instance->writeRow(
                 i,
                 instance->displayRows[readIdx][i]
             );
+
+            digitalWrite(PIN_OE, LOW);
+            delayMicroseconds(instance->brightness);
+            digitalWrite(PIN_OE, HIGH);
+            vTaskDelay(pdMS_TO_TICKS(1));
         }
 
-        // Yield execution to allow watchdog feed without letting low priority tasks block execution
-        vTaskDelay(1);
+        // Reset Task Watchdog Timer thủ công để tránh WDT reset sau mỗi 5s
+        
+        // Nhường nhẹ CPU cho các Task CÙNG ĐỘ ƯU TIÊN (nếu có)
+        // taskYIELD(); 
     }
 }
+
 
 void P10Driver::init() {
     if (isInitialized)
