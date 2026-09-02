@@ -1,5 +1,55 @@
 #include "Animator.h"
 #include <algorithm>
+#include <cmath>
+
+static float cubicBezier(float x, float x1, float y1, float x2, float y2)
+{
+    // Cubic Bézier:
+    //
+    // P0 = (0, 0)
+    // P1 = (x1, y1)
+    // P2 = (x2, y2)
+    // P3 = (1, 1)
+    //
+    // We need to find t where X(t) = x,
+    // then return Y(t).
+
+    auto bezierX = [x1, x2](float t) {
+        float inv = 1.0f - t;
+
+        return
+            3.0f * inv * inv * t * x1 +
+            3.0f * inv * t * t * x2 +
+            t * t * t;
+    };
+
+    auto bezierY = [y1, y2](float t) {
+        float inv = 1.0f - t;
+
+        return
+            3.0f * inv * inv * t * y1 +
+            3.0f * inv * t * t * y2 +
+            t * t * t;
+    };
+
+    // Binary search for t such that bezierX(t) ~= x.
+    float low = 0.0f;
+    float high = 1.0f;
+
+    for (int i = 0; i < 12; ++i) {
+        float t = (low + high) * 0.5f;
+        float bx = bezierX(t);
+
+        if (bx < x)
+            low = t;
+        else
+            high = t;
+    }
+
+    float t = (low + high) * 0.5f;
+
+    return bezierY(t);
+}
 
 Animator::~Animator() {
     if (workerTaskHandle != NULL) {
@@ -120,8 +170,8 @@ void Animator::processBatch(const AnimationBatch& batch) {
     if (batch.tasks.empty() || !driver) return;
 
     struct PreparedTask {
-        uint x;
-        uint y;
+        int x; // Top-left X coordinate on the screen
+        int y; // Top-left Y coordinate on the screen
         uint delay;
         FontRenderer::Bitmap fromBmp;
         FontRenderer::Bitmap toBmp;
@@ -140,8 +190,6 @@ void Animator::processBatch(const AnimationBatch& batch) {
 
     for (const auto& task : batch.tasks) {
         PreparedTask pt;
-        pt.x = task.x;
-        pt.y = task.y;
         pt.delay = task.delay;
         pt.fromBmp = renderStringToBitmap(task.fromText, task.mini);
         pt.toBmp = renderStringToBitmap(task.toText, task.mini);
@@ -149,11 +197,19 @@ void Animator::processBatch(const AnimationBatch& batch) {
         pt.maxW = std::max(pt.fromBmp.w, pt.toBmp.w);
         pt.maxH = std::max(pt.fromBmp.h, pt.toBmp.h);
 
-        // Horizontal alignment offsets within maxW bounding box
+        // 1. Calculate top-left screen position relative to anchor (x, y)
+        pt.x = task.alignLeft ? (int)task.x : ((int)task.x - (int)pt.maxW);
+        pt.y = task.alignTop  ? (int)task.y : ((int)task.y - (int)pt.maxH);
+
+        // 2. Horizontal alignment within bounding box (maxW)
+        // alignLeft = true  -> align left  (offset 0)
+        // alignLeft = false -> align right (offset = maxW - bmp.w)
         pt.fromXOffset = task.alignLeft ? 0 : (pt.maxW - pt.fromBmp.w);
         pt.toXOffset   = task.alignLeft ? 0 : (pt.maxW - pt.toBmp.w);
 
-        // Vertical alignment offsets within maxH bounding box
+        // 3. Vertical alignment within bounding box (maxH)
+        // alignTop = true  -> align top    (offset 0)
+        // alignTop = false -> align bottom (offset = maxH - bmp.h)
         pt.fromYOffset = task.alignTop ? 0 : (pt.maxH - pt.fromBmp.h);
         pt.toYOffset   = task.alignTop ? 0 : (pt.maxH - pt.toBmp.h);
 
@@ -182,7 +238,17 @@ void Animator::processBatch(const AnimationBatch& batch) {
                 if (progress > 1.0f) progress = 1.0f;
             }
 
-            float easedProgress = easeInOutSine(progress);
+            // float easedProgress = cubicBezier(
+            //     progress,
+            //     1.0f, 0.0f,
+            //     0.0f, 1.0f
+            // );
+
+            float easedProgress = cubicBezier(
+                progress,
+                0.5f, 0.0f,
+                0.5f, 1.0f
+            );
 
             // Total vertical distance is maxH + 1px gap
             const int totalDistance = (int)pt.maxH + 1;
