@@ -7,7 +7,6 @@
 #include <AsyncJson.h>
 #include <ESPAsyncWebServer.h>
 #include "storer/Storer.h"
-#include "wifi/WifiController.h"
 
 class ConfigController {
 private:
@@ -16,7 +15,6 @@ private:
     const char* DEFAULT_AP_PASS = "11111111";
 
     Storer* storer = nullptr;
-    WifiController* wifiController = nullptr;
     AsyncWebServer server;
     DNSServer dnsServer;
     TaskHandle_t buttonTaskHandle = nullptr;
@@ -34,5 +32,5 @@ public:
     ConfigController();
     ~ConfigController();
 
-    void init(Storer* storer, WifiController* wifiCtrl = nullptr);
+    void init(Storer* storer);
 };

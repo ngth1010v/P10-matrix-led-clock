@@ -11,7 +11,7 @@ ConfigController::~ConfigController() {
     }
 }
 
-void ConfigController::init(Storer* storer, WifiController* wifiCtrl) {
+void ConfigController::init(Storer* storer) {
     Serial.println();
     Serial.println("========== ConfigController::init ==========");
 
@@ -28,7 +28,6 @@ void ConfigController::init(Storer* storer, WifiController* wifiCtrl) {
     Serial.println("[ConfigController] Storer OK.");
 
     this->storer = storer;
-    this->wifiController = wifiCtrl;
 
     pinMode(BUTTON_PIN, INPUT_PULLUP);
 
@@ -79,10 +78,6 @@ void ConfigController::startServer() {
         return;
     }
 
-    if (wifiController != nullptr) {
-        wifiController->setApActive(true);
-    }
-
     Serial.println("[ConfigController] Step 1: Loading AP config...");
 
     Storer::WifiData apConfig = storer->getConfigWifi();
@@ -106,9 +101,6 @@ void ConfigController::startServer() {
 
     if (!apStarted) {
         Serial.println("[ConfigController] ERROR: SoftAP failed!");
-        if (wifiController != nullptr) {
-            wifiController->setApActive(false);
-        }
         return;
     }
 
@@ -164,10 +156,6 @@ void ConfigController::stopServer() {
 
     serverRunning = false;
     pendingStop = false;
-
-    if (wifiController != nullptr) {
-        wifiController->setApActive(false);
-    }
 
     Serial.println("[ConfigController] Server stopped.");
 
@@ -239,10 +227,6 @@ void ConfigController::setupRoutes() {
                 net.name = jsonObj["internetWifi"]["name"] | "";
                 net.password = jsonObj["internetWifi"]["password"] | "";
                 storer->setInternetWifi(net);
-
-                if (wifiController != nullptr && !net.name.empty()) {
-                    wifiController->addWifi(net.name, net.password);
-                }
             }
 
             if (jsonObj.containsKey("configWifi")) {

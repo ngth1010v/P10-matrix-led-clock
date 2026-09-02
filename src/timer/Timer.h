@@ -1,53 +1,43 @@
-#ifndef TIMER_H
-#define TIMER_H
+#pragma once
 
-#include <WiFi.h>
+#include <Arduino.h>
 #include <time.h>
 #include <sys/time.h>
+#include <WiFi.h>
+#include "storer/Storer.h"
 
 class Timer {
 public:
     struct TimeData {
-        uint32_t mili;     // ms (0 - 999)
-        uint8_t  second;   // 0 - 59
-        uint8_t  minute;   // 0 - 59
-        uint8_t  hour;     // 0 - 23
-        uint8_t  dayOfWeek;// 0 - 6 (0 = Sunday)
-        uint8_t  day;      // 1 - 31
-        uint8_t  month;    // 1 - 12
-        uint32_t year;     // e.g., 2026
+        uint8_t  second;    // 0 - 59
+        uint8_t  minute;    // 0 - 59
+        uint8_t  hour;      // 0 - 23
+        uint8_t  dayOfWeek; // 0 - 6 (0 = Sunday)
+        uint8_t  day;       // 1 - 31
+        uint8_t  month;     // 1 - 12
+        uint32_t year;      // e.g., 2026
     };
 
 private:
-    int8_t timezone = 0;       // UTC offset in hours (-12 to +14)
-    int timestampOffset = 0;   // Custom ms offset
+    Storer* storer = nullptr;
+    TaskHandle_t ntpTaskHandle = nullptr;
 
-    TaskHandle_t taskHandle = nullptr;
-    SemaphoreHandle_t mutex = nullptr;
+    static const char* NTP_SERVER_1;
+    static const char* NTP_SERVER_2;
+    static const char* NTP_SERVER_3;
+    static const char* NTP_SERVER_4;
+    static const char* NTP_SERVER_5;
 
-    const char* ntpServers[5] = {
-        "pool.ntp.org",
-        "time.nist.gov",
-        "time.google.com",
-        "time.cloudflare.com",
-        "0.pool.ntp.org"
-    };
-
+    static void ntpTask(void* parameter);
+    bool connectWifi();
     bool syncNTP();
-    static void timerTask(void* pvParameters);
 
 public:
-    Timer() = default;
+    Timer();
     ~Timer();
 
-    void init();
+    void init(Storer* storer);
 
-    TimeData get();
-    uint32_t getTimestamp(); // Adjusted epoch timestamp in ms
-
-    void setTimezone(int8_t tz);
-    void setTimestampOffset(int offset);
-    int getTimestampOffset();
+    uint64_t getTimestamp(); // in seconds, factors in timezone + timeOffset
+    TimeData get();          // factors in timezone + timeOffset
 };
-
-#endif // TIMER_H
