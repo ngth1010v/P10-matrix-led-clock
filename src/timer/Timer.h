@@ -32,6 +32,8 @@ private:
     bool connectWifi();
     bool syncNTP();
 
+    const uint8_t localOffset = 1;
+
 public:
     Timer();
     ~Timer();

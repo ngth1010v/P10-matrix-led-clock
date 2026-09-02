@@ -138,7 +138,7 @@ uint64_t Timer::getTimestamp() {
     int8_t tzHours = (storer != nullptr) ? storer->getTimezone() : 0;
     int64_t timeOffsetSec = (storer != nullptr) ? storer->getTimeOffset() : 0;
 
-    int64_t totalSeconds = (int64_t)nowSec + ((int64_t)tzHours * 3600) + timeOffsetSec;
+    int64_t totalSeconds = (int64_t)nowSec + ((int64_t)tzHours * 3600) + timeOffsetSec + localOffset;
 
     return (totalSeconds < 0) ? 0 : (uint64_t)totalSeconds;
 }
