@@ -19,6 +19,9 @@ void Storer::init() {
     openConfig   = prefs.getBool("op_cfg", true);
 
     initialized = true;
+
+    Serial.println("[Storer] Initialized");
+    logData();
 }
 
 bool Storer::isInit() const {
@@ -81,6 +84,46 @@ Storer::SleepMode Storer::loadSleepMode() {
     mode.to.second   = prefs.getUChar("sm_ts", 0);
 
     return mode;
+}
+
+void Storer::logData() const {
+    Serial.println("========== STORER DATA ==========");
+
+    Serial.println("[Config WiFi]");
+    Serial.printf("  Name: %s\n", configWifi.name.c_str());
+    Serial.printf("  Password: %s\n", configWifi.password.empty() ? "(empty)" : "********");
+
+    Serial.println("[Internet WiFi]");
+    Serial.printf("  Name: %s\n", internetWifi.name.c_str());
+    Serial.printf("  Password: %s\n", internetWifi.password.empty() ? "(empty)" : "********");
+
+    Serial.println("[Timezone]");
+    Serial.printf("  Timezone: %d\n", timezone);
+
+    Serial.println("[Time Offset]");
+    Serial.printf("  Time Offset: %lld\n", timeOffset);
+
+    Serial.println("[Sleep Mode]");
+    Serial.printf("  Enable: %s\n", sleepMode.enable ? "true" : "false");
+
+    Serial.printf(
+        "  From: %02u:%02u:%02u\n",
+        sleepMode.from.hour,
+        sleepMode.from.minute,
+        sleepMode.from.second
+    );
+
+    Serial.printf(
+        "  To:   %02u:%02u:%02u\n",
+        sleepMode.to.hour,
+        sleepMode.to.minute,
+        sleepMode.to.second
+    );
+
+    Serial.println("[Open Config]");
+    Serial.printf("  Open Config: %s\n", openConfig ? "true" : "false");
+
+    Serial.println("=================================");
 }
 
 // Config WiFi

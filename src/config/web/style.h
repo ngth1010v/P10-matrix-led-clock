@@ -1,3 +1,7 @@
+#pragma once
+#include <Arduino.h>
+
+const char style_css[] PROGMEM = R"rawliteral(
 body{
   background-color: #ffe;
   display: flex;
@@ -107,3 +111,5 @@ body{
 
 
 
+
+)rawliteral";

@@ -40,6 +40,8 @@ private:
     void saveSleepMode(const SleepMode& mode);
     SleepMode loadSleepMode();
 
+    void logData() const;
+
 public:
     Storer();
 
