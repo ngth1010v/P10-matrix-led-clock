@@ -1,118 +1,506 @@
-#include "display/FontRenderer.h"
+#include "FontRenderer.h"
+
+void FontRenderer::set(char c, bool mini, const Bitmap& data) {
+    InternalBitmap internal_bmp;
+    internal_bmp.w = data.w;
+    internal_bmp.h = data.h;
+    internal_bmp.packed_data.resize(data.h, 0);
+
+    // Pack 2D boolean vector [w][h] into row-major byte array
+    // data.pixels[x][y] -> bit x of byte y
+    for (uint8_t x = 0; x < data.w; ++x) {
+        for (uint8_t y = 0; y < data.h; ++y) {
+            if (x < data.pixels.size() && y < data.pixels[x].size()) {
+                if (data.pixels[x][y]) {
+                    internal_bmp.packed_data[y] |= static_cast<uint8_t>(1U << x);
+                }
+            }
+        }
+    }
+
+    bitmapMap[std::make_pair(c, mini)] = internal_bmp;
+}
 
 void FontRenderer::init() {
-    auto addChar = [this](char32_t c, const std::vector<std::vector<bool>>& grid) {
-        Bitmap temp;
-        temp.w = 8;
-        temp.h = 16;
-        temp.data = grid;
-        this->set(c, temp);
+    bitmapMap.clear();
+    is_initialized = true;
+
+    // Helper rút gọn để thêm kí tự trực quan
+    auto add = [this](char c, bool mini, uint8_t w, uint8_t h, std::initializer_list<std::initializer_list<bool>> rows) {
+        Bitmap bmp;
+        bmp.w = w;
+        bmp.h = h;
+        bmp.pixels.resize(w, std::vector<bool>(h, false));
+
+        uint8_t y = 0;
+        for (const auto& row : rows) {
+            if (y >= h) break;
+            uint8_t x = 0;
+            for (bool val : row) {
+                if (x >= w) break;
+                bmp.pixels[x][y] = val; // Gán trực tiếp row-major -> [x][y] mà không cần xoay bitmap
+                ++x;
+            }
+            ++y;
+        }
+        this->set(c, mini, bmp);
     };
 
+    // =========================================================
+    // MINI FONT
+    // =========================================================
 
-    // ==========================================
-    // UPPERCASE LETTERS (A - Z)
-    // ==========================================
-    addChar('A', {
-        {0,0,0,1,1,0,0,0},
-        {0,0,1,0,0,1,0,0},
-        {0,1,0,0,0,0,1,0},
-        {1,0,0,0,0,0,0,1},
-        {1,0,0,0,0,0,0,1},
-        {1,0,0,0,0,0,0,1},
-        {1,0,0,0,0,0,0,1},
-        {1,0,0,0,0,0,0,1},
-        {1,1,1,1,1,1,1,1},
-        {1,0,0,0,0,0,0,1},
-        {1,0,0,0,0,0,0,1},
-        {1,0,0,0,0,0,0,1},
-        {1,0,0,0,0,0,0,1},
-        {1,0,0,0,0,0,0,1},
-        {1,0,0,0,0,0,0,1},
-        {1,0,0,0,0,0,0,1}
+    // A
+    add('A', true, 3, 5, {
+        {1,1,1},
+        {1,0,1},
+        {1,1,1},
+        {1,0,1},
+        {1,0,1},
     });
 
-    addChar('B', {
-        {1,1,1,1,1,1,0,0},
-        {1,0,0,0,0,0,1,0},
-        {1,0,0,0,0,0,1,0},
-        {1,1,1,1,1,1,0,0},
-        {1,0,0,0,0,0,1,0},
-        {1,0,0,0,0,0,1,0},
-        {1,0,0,0,0,0,1,0},
-        {1,1,1,1,1,1,0,0},
-        {0,0,0,0,0,0,0,0},
-        {0,0,0,0,0,0,0,0},
-        {0,0,0,0,0,0,0,0},
-        {0,0,0,0,0,0,0,0},
-        {0,0,0,0,0,0,0,0},
-        {0,0,0,0,0,0,0,0},
-        {0,0,0,0,0,0,0,0},
-        {0,0,0,0,0,0,0,0}
+    // D
+    add('D', true, 3, 5, {
+        {1,1,0},
+        {1,0,1},
+        {1,0,1},
+        {1,0,1},
+        {1,1,0},
     });
 
+    // E
+    add('E', true, 3, 5, {
+        {1,1,1},
+        {1,0,0},
+        {1,1,1},
+        {1,0,0},
+        {1,1,1},
+    });
+
+    // F
+    add('F', true, 3, 5, {
+        {1,1,1},
+        {1,0,0},
+        {1,1,1},
+        {1,0,0},
+        {1,0,0},
+    });
+
+    // H
+    add('H', true, 3, 5, {
+        {1,0,1},
+        {1,0,1},
+        {1,1,1},
+        {1,0,1},
+        {1,0,1},
+    });
+
+    // I
+    add('I', true, 3, 5, {
+        {1,1,1},
+        {0,1,0},
+        {0,1,0},
+        {0,1,0},
+        {1,1,1},
+    });
+
+    // M
+    add('M', true, 5, 5, {
+        {1,0,0,0,1},
+        {1,1,0,1,1},
+        {1,1,1,1,1},
+        {1,0,1,0,1},
+        {1,0,0,0,1},
+    });
+
+    // N
+    add('N', true, 4, 5, {
+        {1,0,0,1},
+        {1,1,0,1},
+        {1,1,1,1},
+        {1,0,1,1},
+        {1,0,0,1},
+    });
+
+    // O
+    add('O', true, 3, 5, {
+        {1,1,1},
+        {1,0,1},
+        {1,0,1},
+        {1,0,1},
+        {1,1,1},
+    });
+
+    // R
+    add('R', true, 3, 5, {
+        {1,1,0},
+        {1,0,1},
+        {1,1,0},
+        {1,0,1},
+        {1,0,1},
+    });
+
+    // S
+    add('S', true, 3, 5, {
+        {1,1,1},
+        {1,0,0},
+        {1,1,1},
+        {0,0,1},
+        {1,1,1},
+    });
+
+    // T
+    add('T', true, 3, 5, {
+        {1,1,1},
+        {0,1,0},
+        {0,1,0},
+        {0,1,0},
+        {0,1,0},
+    });
+
+    // U
+    add('U', true, 3, 5, {
+        {1,0,1},
+        {1,0,1},
+        {1,0,1},
+        {1,0,1},
+        {1,1,1},
+    });
+
+    // W
+    add('W', true, 5, 5, {
+        {1,0,1,0,1},
+        {1,0,1,0,1},
+        {1,0,1,0,1},
+        {1,1,1,1,1},
+        {0,1,0,1,0},
+    });
+
+
+    // =========================================================
+    // NUMBERS (MINI)
+    // =========================================================
+
+    // 0
+    add('0', true, 3, 5, {
+        {1,1,1},
+        {1,0,1},
+        {1,0,1},
+        {1,0,1},
+        {1,1,1},
+    });
+
+    // 1
+    add('1', true, 3, 5, {
+        {0,1,0},
+        {1,1,0},
+        {0,1,0},
+        {0,1,0},
+        {1,1,1},
+    });
+
+    // 2
+    add('2', true, 3, 5, {
+        {1,1,1},
+        {0,0,1},
+        {1,1,1},
+        {1,0,0},
+        {1,1,1},
+    });
+
+    // 3
+    add('3', true, 3, 5, {
+        {1,1,1},
+        {0,0,1},
+        {1,1,1},
+        {0,0,1},
+        {1,1,1},
+    });
+
+    // 4
+    add('4', true, 3, 5, {
+        {1,0,1},
+        {1,0,1},
+        {1,1,1},
+        {0,0,1},
+        {0,0,1},
+    });
+
+    // 5
+    add('5', true, 3, 5, {
+        {1,1,1},
+        {1,0,0},
+        {1,1,1},
+        {0,0,1},
+        {1,1,1},
+    });
+
+    // 6
+    add('6', true, 3, 5, {
+        {1,1,1},
+        {1,0,0},
+        {1,1,1},
+        {1,0,1},
+        {1,1,1},
+    });
+
+    // 7
+    add('7', true, 3, 5, {
+        {1,1,1},
+        {0,0,1},
+        {0,0,1},
+        {0,0,1},
+        {0,0,1},
+    });
+
+    // 8
+    add('8', true, 3, 5, {
+        {1,1,1},
+        {1,0,1},
+        {1,1,1},
+        {1,0,1},
+        {1,1,1},
+    });
+
+    // 9
+    add('9', true, 3, 5, {
+        {1,1,1},
+        {1,0,1},
+        {1,1,1},
+        {0,0,1},
+        {1,1,1},
+    });
+
+
+    // =========================================================
+    // SYMBOLS
+    // =========================================================
+
+    // :
+    add(':', true, 1, 5, {
+        {0},
+        {1},
+        {0},
+        {1},
+        {0},
+    });
+
+    // /
+    add('/', true, 2, 5, {
+        {0,1},
+        {0,1},
+        {1,1},
+        {1,0},
+        {1,0},
+    });
+
+    // <space>
+    add(' ', false, 3, 5, {
+        {0,0,0},
+        {0,0,0},
+        {0,0,0},
+        {0,0,0},
+        {0,0,0},
+    });
+
+
+    // =========================================================
+    // NON MINI
+    // =========================================================
+    // 0
+    add('0', false, 6, 10, {
+        {0,1,1,1,1,0},
+        {1,0,0,0,0,1},
+        {1,0,0,0,0,1},
+        {1,0,0,0,0,1},
+        {1,0,0,0,0,1},
+        {1,0,0,0,0,1},
+        {1,0,0,0,0,1},
+        {1,0,0,0,0,1},
+        {1,0,0,0,0,1},
+        {0,1,1,1,1,0},
+    });
+
+    // 1
+    add('1', false, 6, 10, {
+        {0,0,1,0,0,0},
+        {0,1,1,0,0,0},
+        {1,0,1,0,0,0},
+        {0,0,1,0,0,0},
+        {0,0,1,0,0,0},
+        {0,0,1,0,0,0},
+        {0,0,1,0,0,0},
+        {0,0,1,0,0,0},
+        {0,0,1,0,0,0},
+        {1,1,1,1,1,0},
+    });
+
+    // 2
+    add('2', false, 6, 10, {
+        {0,1,1,1,1,0},
+        {1,0,0,0,0,1},
+        {0,0,0,0,0,1},
+        {0,0,0,0,1,0},
+        {0,0,0,1,0,0},
+        {0,0,1,0,0,0},
+        {0,1,0,0,0,0},
+        {1,0,0,0,0,0},
+        {1,0,0,0,0,1},
+        {1,1,1,1,1,1},
+    });
+
+    // 3
+    add('3', false, 6, 10, {
+        {0,1,1,1,1,0},
+        {1,0,0,0,0,1},
+        {0,0,0,0,0,1},
+        {0,0,0,0,1,0},
+        {0,0,1,1,0,0},
+        {0,0,0,0,1,0},
+        {0,0,0,0,0,1},
+        {0,0,0,0,0,1},
+        {1,0,0,0,0,1},
+        {0,1,1,1,1,0},
+    });
+
+    // 4
+    add('4', false, 6, 10, {
+        {0,0,0,1,0,0},
+        {0,0,1,1,0,0},
+        {0,1,0,1,0,0},
+        {1,0,0,1,0,0},
+        {1,0,0,1,0,0},
+        {1,1,1,1,1,1},
+        {0,0,0,1,0,0},
+        {0,0,0,1,0,0},
+        {0,0,0,1,0,0},
+        {0,0,0,1,0,0},
+    });
+
+    // 5
+    add('5', false, 6, 10, {
+        {1,1,1,1,1,1},
+        {1,0,0,0,0,0},
+        {1,0,0,0,0,0},
+        {1,1,1,1,1,0},
+        {0,0,0,0,0,1},
+        {0,0,0,0,0,1},
+        {0,0,0,0,0,1},
+        {1,0,0,0,0,1},
+        {1,0,0,0,0,1},
+        {0,1,1,1,1,0},
+    });
+
+    // 6
+    add('6', false, 6, 10, {
+        {0,1,1,1,1,0},
+        {1,0,0,0,0,1},
+        {1,0,0,0,0,0},
+        {1,1,1,1,1,0},
+        {1,0,0,0,0,1},
+        {1,0,0,0,0,1},
+        {1,0,0,0,0,1},
+        {1,0,0,0,0,1},
+        {1,0,0,0,0,1},
+        {0,1,1,1,1,0},
+    });
+
+    // 7
+    add('7', false, 6, 10, {
+        {1,1,1,1,1,1},
+        {0,0,0,0,0,1},
+        {0,0,0,0,1,0},
+        {0,0,0,1,0,0},
+        {0,0,1,0,0,0},
+        {0,0,1,0,0,0},
+        {0,0,1,0,0,0},
+        {0,0,1,0,0,0},
+        {0,0,1,0,0,0},
+        {0,0,1,0,0,0},
+    });
+
+    // 8
+    add('8', false, 6, 10, {
+        {0,1,1,1,1,0},
+        {1,0,0,0,0,1},
+        {1,0,0,0,0,1},
+        {1,0,0,0,0,1},
+        {0,1,1,1,1,0},
+        {1,0,0,0,0,1},
+        {1,0,0,0,0,1},
+        {1,0,0,0,0,1},
+        {1,0,0,0,0,1},
+        {0,1,1,1,1,0},
+    });
+
+    // 9
+    add('9', false, 6, 10, {
+        {0,1,1,1,1,0},
+        {1,0,0,0,0,1},
+        {1,0,0,0,0,1},
+        {1,0,0,0,0,1},
+        {0,1,1,1,1,1},
+        {0,0,0,0,0,1},
+        {0,0,0,0,0,1},
+        {0,0,0,0,0,1},
+        {1,0,0,0,0,1},
+        {0,1,1,1,1,0},
+    });
+
+    // :
+    add(':', false, 1, 10, {
+        {0},
+        {0},
+        {1},
+        {0},
+        {0},
+        {0},
+        {0},
+        {1},
+        {0},
+        {0},
+    });
+
+    // <space>
+    add(' ', false, 6, 10, {
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+    });
 }
 
-void FontRenderer::set(char32_t c, const Bitmap& bmp) {
-    InternalBitmap internal_bmp;
-    internal_bmp.w = bmp.w;
-    internal_bmp.h = bmp.h;
-    internal_bmp.compressed_data = compressBitmap(bmp.data, bmp.w, bmp.h);
 
-    font_cache_[c] = std::move(internal_bmp);
-}
 
-FontRenderer::Bitmap FontRenderer::get(char32_t c, unsigned int target_w, unsigned int target_h) const {
-    auto it = font_cache_.find(c);
-    if (it == font_cache_.end()) {
-        // Return empty bitmap (w = 0, h = 0) for unset character
-        return Bitmap{};
+FontRenderer::Bitmap FontRenderer::get(char c, bool mini) {
+    // Return empty bitmap if init() was not called or character not found
+    auto key = std::make_pair(c, mini);
+    auto it = bitmapMap.find(key);
+
+    if (!is_initialized || it == bitmapMap.end()) {
+        return Bitmap{}; // Trả về Bitmap rỗng mặc định (w=0, h=0, pixels rỗng)
     }
 
-    Bitmap original;
-    original.w = it->second.w;
-    original.h = it->second.h;
-    original.data = decompressBitmap(it->second.compressed_data, original.w, original.h);
+    const InternalBitmap& internal_bmp = it->second;
+    Bitmap result;
+    result.w = internal_bmp.w;
+    result.h = internal_bmp.h;
 
-    return convertResolution(original, target_w, target_h);
-}
+    // Reconstruct 2D bool vector [w][h] from row-major bytes
+    result.pixels.resize(result.w, std::vector<bool>(result.h, false));
 
-FontRenderer::Bitmap FontRenderer::convertResolution(const Bitmap& origin, unsigned int target_w, unsigned int target_h) const {
-    // Placeholder resolution converter (returns original)
-    (void)target_w;
-    (void)target_h;
-    return origin;
-}
-
-std::vector<uint8_t> FontRenderer::compressBitmap(const std::vector<std::vector<bool>>& data, unsigned int w, unsigned int h) {
-    size_t total_bits = static_cast<size_t>(w) * h;
-    size_t total_bytes = (total_bits + 7) / 8;
-
-    std::vector<uint8_t> compressed(total_bytes, 0);
-
-    for (unsigned int y = 0; y < h; ++y) {
-        for (unsigned int x = 0; x < w; ++x) {
-            if (y < data.size() && x < data[y].size() && data[y][x]) {
-                size_t bit_index = static_cast<size_t>(y) * w + x;
-                compressed[bit_index / 8] |= (1 << (7 - (bit_index % 8)));
-            }
+    for (uint8_t y = 0; y < result.h; ++y) {
+        uint8_t row_byte = internal_bmp.packed_data[y];
+        for (uint8_t x = 0; x < result.w; ++x) {
+            result.pixels[x][y] = (row_byte & (1U << x)) != 0;
         }
     }
 
-    return compressed;
-}
-
-std::vector<std::vector<bool>> FontRenderer::decompressBitmap(const std::vector<uint8_t>& compressed, unsigned int w, unsigned int h) {
-    std::vector<std::vector<bool>> data(h, std::vector<bool>(w, false));
-
-    for (unsigned int y = 0; y < h; ++y) {
-        for (unsigned int x = 0; x < w; ++x) {
-            size_t bit_index = static_cast<size_t>(y) * w + x;
-            if ((compressed[bit_index / 8] & (1 << (7 - (bit_index % 8)))) != 0) {
-                data[y][x] = true;
-            }
-        }
-    }
-
-    return data;
+    return result;
 }

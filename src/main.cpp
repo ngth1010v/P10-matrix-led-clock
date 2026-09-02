@@ -29,15 +29,11 @@ void setup() {
     fontRenderer.init();
 
     // Test font rendering
-    const char32_t a = 'A';
-    FontRenderer::Bitmap testA = fontRenderer.get(a, 16, 8);
-    for (int y = 0; y < testA.h; y++) {
-        for (int x = 0; x < testA.w; x++) {
-            p10Driver.set(x, y, testA.data[y][x]);
-            Serial.print(testA.data[y][x]);
-            Serial.print(' ');
+    FontRenderer::Bitmap testA = fontRenderer.get('A',true);
+    for (int x = 0; x < testA.w; x++) {
+        for (int y = 0; y < testA.h; y++) {
+            p10Driver.set(x+4, y, testA.pixels[x][y]);
         }
-        Serial.print('\n');
     }
     p10Driver.flush();
 }
