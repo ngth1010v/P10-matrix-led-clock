@@ -1,4 +1,6 @@
 #include <Arduino.h>
+#include <string>
+
 #include "display/P10Driver.h"
 #include "display/FontRenderer.h"
 
@@ -6,6 +8,8 @@
 #include "config/ConfigController.h"
 #include "timer/Timer.h"
 #include "display/Animator.h"
+
+
 
 // Module Instances
 Storer storer;
@@ -35,50 +39,337 @@ void setup() {
 
     // Initialize Animator module
     animator.init(&p10Driver, &fontRenderer);
-
-    // Test initial static rendering
-    FontRenderer::Bitmap testA = fontRenderer.get('A', true);
-    for (int x = 0; x < testA.w; x++) {
-        for (int y = 0; y < testA.h; y++) {
-            p10Driver.set(x + 4, y, testA.pixels[x][y]);
-        }
-    }
-    p10Driver.flush();
     
     Serial.println("[SETUP] Setup completed. Starting animation sequence in loop...");
 }
 
+
+std::string currentTimeString = "        ";
+std::string currentDayOfWeekString = "";
+std::string currentDateString = "     ";
+std::string currentMiniClockString = "        ";
+
 void loop() {
-    delay(1000); // Wait 2 seconds between batch animations
+    delay(1000);
 
-    // Form string transitions for testing
-    char fromStr[4];
-    char toStr[4];
+    // Mode:
+    bool sleepModeOn = false;
+    {
+        const Storer::SleepMode sleepMode = storer.getSleepMode();
+
+        if (sleepMode.enable) {
+            constexpr unsigned int DAY_SECONDS = 24 * 60 * 60;
+
+            const unsigned int fromDayTs =
+                sleepMode.from.hour * 60 * 60 +
+                sleepMode.from.minute * 60 +
+                sleepMode.from.second;
+
+            const unsigned int toDayTs =
+                sleepMode.to.hour * 60 * 60 +
+                sleepMode.to.minute * 60 +
+                sleepMode.to.second;
+
+            const unsigned int currentDayTs =
+                timerModule.getTimestamp() % DAY_SECONDS;
+
+            if (fromDayTs < toDayTs) {
+                // Normal: e.g. 06:00 -> 22:00
+                sleepModeOn =
+                    fromDayTs <= currentDayTs &&
+                    currentDayTs < toDayTs;
+            }
+            else if (fromDayTs > toDayTs) {
+                // Cross midnight: e.g. 22:00 -> 06:00
+                sleepModeOn =
+                    currentDayTs >= fromDayTs ||
+                    currentDayTs < toDayTs;
+            }
+            else {
+                // from == to -> no active interval
+                sleepModeOn = false;
+            }
+        }
+    }
+
+    // Sleep mode off
+    if (!sleepModeOn) {
+        Timer::TimeData tData = timerModule.get();
+
+        // Time clock: HHMMSS
+        {
+            char buffer[9];
+
+            snprintf(
+                buffer,
+                sizeof(buffer),
+                "%02u:%02u:%02u",
+                tData.hour,
+                tData.minute,
+                tData.second
+            );
+
+            const std::string nextTimeString(buffer);
+
+            auto animateDigit = [&](uint x, char from, char to, uint delay) {
+                if (from != to) {
+                    animator.animate(
+                        x,
+                        0,
+                        std::string(1, from),
+                        std::string(1, to),
+                        false,
+                        delay
+                    );
+                }
+            };
+
+            // Hour
+            animateDigit(0,  currentTimeString[0], nextTimeString[0], 500);
+            animateDigit(6,  currentTimeString[1], nextTimeString[1], 400);
+
+            animateDigit(13, currentTimeString[2], nextTimeString[2], 350);
+            
+            animateDigit(16, currentTimeString[3], nextTimeString[3], 300);
+            animateDigit(22, currentTimeString[4], nextTimeString[4], 200);
+            
+            animateDigit(29, currentTimeString[5], nextTimeString[5], 250);
+            
+            animateDigit(32, currentTimeString[6], nextTimeString[6], 100);
+            animateDigit(38, currentTimeString[7], nextTimeString[7], 0);
+
+            currentTimeString = nextTimeString;
+        }
+
+        // Day of week
+        {
+            const char* daysOfWeek[] = {"S U N", "M O N", "T U E", "W E D", "T H U", "F R I", "S A T"};
+            std::string nextDayOfWeek = (tData.dayOfWeek < 7) ? daysOfWeek[tData.dayOfWeek] : "---";
+
+            if (currentDayOfWeekString != nextDayOfWeek){
+                animator.animate(
+                    64,
+                    0,
+                    currentDayOfWeekString,
+                    nextDayOfWeek,
+                    true,
+                    0,
+                    true,
+                    false
+                );   
+                
+                currentDayOfWeekString = nextDayOfWeek;
+            }
+        }
+
+        // Date (dd/mm)
+        {
+            char buffer[6];
+
+            snprintf(
+                buffer,
+                sizeof(buffer),
+                "%02u/%02u",
+                tData.day,
+                tData.month
+            );
+
+            const std::string nextDateString(buffer);
+
+            auto animateDigit = [&](uint x, char from, char to, uint delay) {
+                if (from != to) {
+                    animator.animate(
+                        x,
+                        11,
+                        std::string(1, from),
+                        std::string(1, to),
+                        true,
+                        delay
+                    );
+                }
+            };
+
+            animateDigit(46, currentDateString[0], nextDateString[0], 300);
+            animateDigit(50, currentDateString[1], nextDateString[1], 200);
+
+            animateDigit(54, currentDateString[2], nextDateString[2], 300);
+            
+            animateDigit(57, currentDateString[3], nextDateString[3], 100);
+            animateDigit(61, currentDateString[4], nextDateString[4], 0);
+
+            currentDateString = nextDateString;
+        }
+
+        // CLEAR: Mini clock
+        {
+            const std::string nextMiniClockString = "        ";
+
+            auto animateDigit = [&](uint x, char from, char to, uint delay) {
+                if (from != to) {
+                    animator.animate(
+                        x,
+                        11,
+                        std::string(1, from),
+                        std::string(1, to),
+                        true,
+                        delay
+                    );
+                }
+            };
+
+            // Hour
+            animateDigit(0,  currentMiniClockString[0], nextMiniClockString[0], 500);
+            animateDigit(4,  currentMiniClockString[1], nextMiniClockString[1], 400);
+
+            animateDigit(8, currentMiniClockString[2], nextMiniClockString[2], 350);
+            
+            animateDigit(10, currentMiniClockString[3], nextMiniClockString[3], 300);
+            animateDigit(14, currentMiniClockString[4], nextMiniClockString[4], 200);
+            
+            animateDigit(18, currentMiniClockString[5], nextMiniClockString[5], 350);
+            
+            animateDigit(20, currentMiniClockString[6], nextMiniClockString[6], 100);
+            animateDigit(24, currentMiniClockString[7], nextMiniClockString[7], 0);
+
+            currentMiniClockString = nextMiniClockString;
+        }
+
+
+    }
     
-    snprintf(fromStr, sizeof(fromStr), "%02d", counter % 100);
-    counter++;
-    snprintf(toStr, sizeof(toStr), "%02d", counter % 100);
+    // Sleep mode on
+    if (sleepModeOn) {
+        Timer::TimeData tData = timerModule.get();
 
-    Serial.printf("[MAIN LOOP] Animating Digits: '%s' -> '%s'\n", fromStr, toStr);
+        // CLEAR: Time clock: HHMMSS
+        {
+            const std::string nextTimeString("        ");
 
-    // Task 1: Large font digit slide down (x=0, y=0, non-mini)
-    animator.animate(0, 0, std::string(fromStr), std::string(toStr), false, 0);
+            auto animateDigit = [&](uint x, char from, char to, uint delay) {
+                if (from != to) {
+                    animator.animate(
+                        x,
+                        0,
+                        std::string(1, from),
+                        std::string(1, to),
+                        false,
+                        delay
+                    );
+                }
+            };
 
-    // Task 2: Mini font string slide down with a 100ms delay in the same batch (x=20, y=8, mini)
-    std::string miniFrom = (counter % 2 == 1) ? "RUN" : "SET";
-    std::string miniTo   = (counter % 2 == 1) ? "SET" : "RUN";
-    animator.animate(20, 8, miniFrom, miniTo, true, 100);
+            // Hour
+            animateDigit(0,  currentTimeString[0], nextTimeString[0], 500);
+            animateDigit(6,  currentTimeString[1], nextTimeString[1], 400);
 
-    // Seal and execute batch concurrently
+            animateDigit(13, currentTimeString[2], nextTimeString[2], 350);
+            
+            animateDigit(16, currentTimeString[3], nextTimeString[3], 300);
+            animateDigit(22, currentTimeString[4], nextTimeString[4], 200);
+            
+            animateDigit(29, currentTimeString[5], nextTimeString[5], 250);
+            
+            animateDigit(32, currentTimeString[6], nextTimeString[6], 100);
+            animateDigit(38, currentTimeString[7], nextTimeString[7], 0);
+
+            currentTimeString = nextTimeString;
+        }
+
+        // CLEAR: Day of week
+        {
+            std::string nextDayOfWeek = "   ";
+
+            if (currentDayOfWeekString != nextDayOfWeek){
+                animator.animate(
+                    64,
+                    0,
+                    currentDayOfWeekString,
+                    nextDayOfWeek,
+                    true,
+                    0,
+                    true,
+                    false
+                );   
+                
+                currentDayOfWeekString = nextDayOfWeek;
+            }
+        }
+
+        // CLEAR: Date (dd/mm)
+        {
+            const std::string nextDateString = "     ";
+
+            auto animateDigit = [&](uint x, char from, char to, uint delay) {
+                if (from != to) {
+                    animator.animate(
+                        x,
+                        11,
+                        std::string(1, from),
+                        std::string(1, to),
+                        true,
+                        delay
+                    );
+                }
+            };
+
+            animateDigit(46, currentDateString[0], nextDateString[0], 300);
+            animateDigit(50, currentDateString[1], nextDateString[1], 200);
+
+            animateDigit(54, currentDateString[2], nextDateString[2], 300);
+            
+            animateDigit(57, currentDateString[3], nextDateString[3], 100);
+            animateDigit(61, currentDateString[4], nextDateString[4], 0);
+
+            currentDateString = nextDateString;
+        }
+
+        // Mini clock
+        {
+            char buffer[9];
+
+            snprintf(
+                buffer,
+                sizeof(buffer),
+                "%02u:%02u:%02u",
+                tData.hour,
+                tData.minute,
+                tData.second
+            );
+
+            const std::string nextMiniClockString(buffer);
+
+            auto animateDigit = [&](uint x, char from, char to, uint delay) {
+                if (from != to) {
+                    animator.animate(
+                        x,
+                        11,
+                        std::string(1, from),
+                        std::string(1, to),
+                        true,
+                        delay
+                    );
+                }
+            };
+
+            // Hour
+            animateDigit(0,  currentMiniClockString[0], nextMiniClockString[0], 500);
+            animateDigit(4,  currentMiniClockString[1], nextMiniClockString[1], 400);
+
+            animateDigit(8, currentMiniClockString[2], nextMiniClockString[2], 350);
+            
+            animateDigit(10, currentMiniClockString[3], nextMiniClockString[3], 300);
+            animateDigit(14, currentMiniClockString[4], nextMiniClockString[4], 200);
+            
+            animateDigit(18, currentMiniClockString[5], nextMiniClockString[5], 250);
+            
+            animateDigit(20, currentMiniClockString[6], nextMiniClockString[6], 100);
+            animateDigit(24, currentMiniClockString[7], nextMiniClockString[7], 0);
+
+            currentMiniClockString = nextMiniClockString;
+        }
+
+    }
+    
+    
     animator.startAnimate();
-
-    // Testing and verifying Timer output in main loop
-    uint64_t ts = timerModule.getTimestamp();
-    Timer::TimeData tData = timerModule.get();
-
-    Serial.printf("[MAIN LOOP] Timestamp: %llu | Date: %04u-%02u-%02u %02u:%02u:%02u (DoW: %u)\n",
-                  ts,
-                  tData.year, tData.month, tData.day,
-                  tData.hour, tData.minute, tData.second,
-                  tData.dayOfWeek);
 }
