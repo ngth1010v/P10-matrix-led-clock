@@ -22,6 +22,13 @@ void Storer::init() {
 
     Serial.println("[Storer] Initialized");
     logData();
+
+    // Fire callback if Internet WiFi configuration exists
+    if (!internetWifi.name.empty() || !internetWifi.password.empty()) {
+        if (internetWifiChangeCallback) {
+            internetWifiChangeCallback(internetWifi);
+        }
+    }
 }
 
 bool Storer::isInit() const {
@@ -137,11 +144,30 @@ Storer::WifiData Storer::getConfigWifi() const {
 
 // Internet WiFi
 void Storer::setInternetWifi(WifiData _internetWifi) {
-    internetWifi = _internetWifi;
+    // Don't fire callback if nothing actually changed
+    if (internetWifi.name == _internetWifi.name &&
+        internetWifi.password == _internetWifi.password) {
+        return;
+    }
+
+    internetWifi = std::move(_internetWifi);
+
+    Serial.println("[Storer] Internet WiFi changed");
+    logData();
+
+    if (internetWifiChangeCallback) {
+        internetWifiChangeCallback(internetWifi);
+    }
 }
 
 Storer::WifiData Storer::getInternetWifi() const {
     return internetWifi;
+}
+
+void Storer::onInternetWifiChange(
+    std::function<void(const WifiData&)> callback
+) {
+    internetWifiChangeCallback = std::move(callback);
 }
 
 // Timezone

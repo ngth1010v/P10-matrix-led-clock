@@ -3,6 +3,7 @@
 #include <string>
 #include <cstdint>
 #include <Preferences.h>
+#include <functional>
 
 class Storer {
 public:
@@ -41,6 +42,7 @@ private:
     SleepMode loadSleepMode();
 
     void logData() const;
+    std::function<void(const WifiData&)> internetWifiChangeCallback;
 
 public:
     Storer();
@@ -56,6 +58,7 @@ public:
     // Internet WiFi
     void setInternetWifi(WifiData _internetWifi);
     WifiData getInternetWifi() const;
+    void onInternetWifiChange(std::function<void(const WifiData&)> callback);
 
     // Timezone
     void setTimezone(int8_t _timezone);
