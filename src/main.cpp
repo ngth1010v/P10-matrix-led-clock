@@ -8,14 +8,13 @@
 #include "config/ConfigController.h"
 #include "timer/Timer.h"
 #include "display/Animator.h"
-#include "buzzer/Buzzer.h"
+
 
 
 // Module Instances
 Storer storer;
 ConfigController configController;
 
-Buzzer buzzer;
 P10Driver p10Driver;
 Timer timerModule;
 FontRenderer fontRenderer;
@@ -29,8 +28,6 @@ void setup() {
     delay(500);
 
     // Initialize storage and config modules
-    buzzer.init();
-
     storer.init();
     configController.init(&storer);
 
